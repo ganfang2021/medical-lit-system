@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 
-from core import (appraisal, cache, cite, feedback, health, http, jobs, library, locate,
+from core import (appraisal, cache, cite, cn_terms, feedback, health, http, jobs, library, locate,
                   logger, mesh, pdfdoc, pubmed, quota, review, summarizer, storage, translate)
 from version import APP_VERSION  # 版本单一来源（v2.5.0）：发版只需改 version.py
 
@@ -4133,13 +4133,75 @@ elif page == "文献检索":
 
     col_q, col_n = st.columns([4, 1])
     with col_q:
-        keyword = st.text_input("主关键词（必填）", placeholder="例如：immunotherapy lung cancer", key="kw")
+        keyword = st.text_input(
+            "主关键词（必填）",
+            placeholder="例如：immunotherapy lung cancer 或 chest pain",
+            key="kw",
+            help="PubMed 只索引英文文献，请用英文关键词或 MeSH 主题词。"
+                 "输入中文会命中 0 条，下方会给出对应的英文建议。",
+        )
     with col_n:
         retmax = st.select_slider(
             "返回条数", options=[5, 10, 20, 30, 50, 100, 200], key="kw_n",
             help="综述工作台建议 ≥50：对比表需要足够多的文献才能看出结论分歧；"
                  "条数越多检索越慢（每 50 条约需数秒）。",
         )
+
+    # ---------------- 中文关键词提示 ----------------
+    # 中文词提交给 E-utilities 是「请求成功、命中 0 条」，用户只看到「没有检索到
+    # 文献」，旧提示还让人以为是自己关键词不够宽泛。这里先讲清原因、给英文建议，
+    # 由用户决定是否替换；不擅自改写输入，也不在首屏偷偷发翻译请求。
+    _cn_cache = st.session_state.setdefault("cn_en_cache", {})
+
+    def _cn_translate(k: str):
+        """按需中译英，按原词缓存结果，避免每次 rerun 都重复请求。"""
+        if k in _cn_cache:
+            return
+        try:
+            text, provider = translate.translate_keyword(k, "zh-CN|en")
+            ok = bool(text) and text.strip() and text.strip().lower() != k.lower()
+            _cn_cache[k] = (text.strip(), provider) if ok else ("", "none")
+        except Exception:
+            _cn_cache[k] = ("", "none")
+
+    def _cn_use(value: str):
+        st.session_state["kw"] = value
+
+    def _cn_use_and_search(value: str):
+        """0 结果时用：替换关键词并直接发起一次英文检索，省掉再点一次按钮。"""
+        st.session_state["kw"] = value
+        st.session_state["cn_auto_search"] = True
+
+    if keyword.strip() and cn_terms.has_cjk(keyword):
+        _k = keyword.strip()
+        _tried = _cn_cache.get(_k)
+        _from_dict = cn_terms.lookup(_k)
+        _en = _from_dict or (_tried[0] if _tried else "")
+        _source = "内置中英对照" if _from_dict else ("机器翻译，建议核对术语" if _en else "")
+
+        st.warning(
+            "**PubMed 只索引英文文献**，MeSH 词表也全是英文主题词。直接提交中文关键词"
+            "会「请求成功但命中 0 条」。请改用英文关键词，或点下方建议一键替换。"
+        )
+        if _en:
+            st.caption(f"建议英文关键词：{_en}（{_source}）")
+            st.button(
+                f"✅ 改用「{_en}」检索",
+                key="cn_use_en",
+                on_click=_cn_use,
+                args=(_en,),
+                help="把主关键词替换成英文，替换后需再点一次「开始检索」。",
+            )
+        elif _tried is None:
+            st.button(
+                "🔤 帮我译成英文",
+                key="cn_do_translate",
+                on_click=_cn_translate,
+                args=(_k,),
+                help="词表里没有这个词时，调用翻译接口生成英文建议；不会自动修改你输入的内容。",
+            )
+        else:
+            st.caption("自动翻译也没给出可靠结果。建议手动换成英文术语，或用侧边栏 MeSH 词表查官方主题词。")
 
     with st.expander("⚙️ 高级检索条件"):
         s1, s2 = st.columns([3, 2])
@@ -4252,7 +4314,8 @@ elif page == "文献检索":
             + "`"
         )
 
-    if st.button("🔍 开始检索", type="primary", use_container_width=True):
+    _cn_auto_search = st.session_state.pop("cn_auto_search", False)
+    if st.button("🔍 开始检索", type="primary", use_container_width=True) or _cn_auto_search:
         if not keyword.strip():
             st.warning("请输入主关键词")
         else:
@@ -4315,7 +4378,8 @@ elif page == "文献检索":
                 feedback.bump_usage()  # 本机使用计数（v3.7.0）：只落盘 data/，绝不上传
 
     # 拼写建议（espell 接口，与上面的 MeSH 词表联动是两件事）
-    if keyword.strip() and not ensure_results():
+    # 中文词走 espell 只会白跑一趟请求，跳过；针对性提示在下方结果区给。
+    if keyword.strip() and not ensure_results() and not cn_terms.has_cjk(keyword):
         for s in pubmed.spelling_suggest(keyword):
             st.info(f"💡 未找到匹配结果，是否想检索：**{s}**？")
 
@@ -4328,7 +4392,24 @@ elif page == "文献检索":
     for a in results:
         article_card(a)
     if not results and st.session_state.get("last_query"):
-        st.info("没有检索到文献，试试更宽泛的关键词。")
+        _last_kw = (st.session_state.get("last_keyword") or "").strip()
+        if cn_terms.has_cjk(_last_kw):
+            st.info(
+                "本次用的是中文关键词，PubMed 只索引英文文献与英文 MeSH 词表，"
+                "所以命中 0 条——不是网络故障，也不是关键词太窄。"
+                "点下方按钮即可改用英文重新检索。"
+            )
+            _en_retry = cn_terms.lookup(_last_kw) or (_cn_cache.get(_last_kw) or ("", ""))[0]
+            if _en_retry:
+                st.button(
+                    f"✅ 改用「{_en_retry}」并重新检索",
+                    key="cn_retry_en",
+                    type="primary",
+                    on_click=_cn_use_and_search,
+                    args=(_en_retry,),
+                )
+        else:
+            st.info("没有检索到文献，试试更宽泛的关键词。")
 
 
 

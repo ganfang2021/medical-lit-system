@@ -1,0 +1,30 @@
+# MedLit 手机版 · systemd 开机自启单元
+#
+#   sudo cp mobile/deploy/medlit-mobile.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now medlit-mobile
+#   sudo journalctl -u medlit-mobile -f
+#
+# 安装前按实际环境改 User / WorkingDirectory / ExecStart 里的 node 路径，
+# 并确认 .venv 已装好 requirements.txt（start.js 会优先用它）。
+[Unit]
+Description=MedLit Mobile (Streamlit + PWA gateway)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=medlit
+WorkingDirectory=/opt/medical-lit-system
+Environment=MOBILE_PORT=8080
+Environment=STREAMLIT_PORT=8501
+Environment=STREAMLIT_HOST=127.0.0.1
+ExecStart=/usr/bin/node mobile/start.js
+Restart=always
+RestartSec=5
+# 只监听本机给 Caddy 转发即可，公网入口由 Caddy 承担
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

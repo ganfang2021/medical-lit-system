@@ -132,7 +132,9 @@ st.set_page_config(
     page_title="医学文献智能摘要与检索系统",
     page_icon="🩺",
     layout="wide",
-    initial_sidebar_state="expanded",
+    # auto = 宽屏展开侧边栏、窄屏自动收起为抽屉。
+    # 原来写死 expanded，手机上打开就被侧边栏盖住主内容，几乎没法用。
+    initial_sidebar_state="auto",
 )
 
 # ---------------- 全局样式（简约清新主题） ----------------
@@ -349,6 +351,112 @@ st.markdown(
     .app-footer b { color: var(--ink); }
     .app-footer .ft-warn { color: #a32d2d; }
     hr { border-color: var(--line); }
+
+    /* ==================== 移动端适配 v1 ====================
+       全部规则都关在窄屏媒体查询里，桌面端样式一行未改。
+       要解决的四个问题：wide 布局横向溢出、侧边栏盖住主内容、
+       表格把页面撑爆、触控目标太小（iOS 输入框 <16px 还会自动缩放整页）。 */
+    div[class*="st-key-mobile-nav"] { display: none; }   /* 顶部快捷导航只在窄屏出现 */
+
+    @media screen and (max-width: 768px) {
+        html, body { max-width: 100%; overflow-x: hidden; }
+        .stApp { -webkit-text-size-adjust: 100%; }
+
+        /* 1. 版面：去掉桌面端的大留白，左右留安全区（刘海屏 / 圆角） */
+        .block-container {
+            max-width: 100% !important;
+            padding-top: .85rem !important;
+            padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px)) !important;
+            padding-left: max(.7rem, env(safe-area-inset-left, 0px)) !important;
+            padding-right: max(.7rem, env(safe-area-inset-right, 0px)) !important;
+        }
+        [data-testid="stHeader"] { background: rgba(247, 251, 250, .93); }
+        .page-head { padding: .8rem .9rem !important; border-radius: 13px; }
+        .page-head h1 { font-size: 1.06rem !important; line-height: 1.45; }
+        .page-head p { font-size: .8rem !important; line-height: 1.55; }
+        div[class*="st-key-hero"] { padding: 1.15rem 1rem 1rem !important; border-radius: 18px; }
+        .hero-wrap h1 { font-size: 1.42rem !important; line-height: 1.35; }
+        .hero-sub { font-size: .88rem !important; }
+        .hero-svg-box { display: none !important; }        /* 装饰插画在小屏纯占地方 */
+        div[class*="st-key-featcard"] { padding: .9rem .9rem .55rem !important; }
+        .fc-desc { min-height: 0 !important; font-size: .82rem; }
+        .step { padding: .8rem .9rem; }
+        div[class*="st-key-panel"], div[class*="st-key-step-card"],
+        div[class*="st-key-step-params"] { padding: .9rem !important; border-radius: 14px; }
+        .stat-card .v { font-size: 1.3rem; }
+        .sec-title { margin: .9rem 0 .6rem; }
+        .sec-title .tx { font-size: .98rem; }
+        .app-footer { font-size: .75rem; padding: .7rem .85rem; margin-top: 1.5rem; }
+
+        /* 2. 内容不撑爆页面：长文本折行、图片等比、表格单独横滑 */
+        [data-testid="stMarkdown"], [data-testid="stText"] {
+            overflow-wrap: anywhere; word-break: break-word;
+        }
+        img { max-width: 100% !important; height: auto; }
+        pre { white-space: pre-wrap; word-break: break-word; }
+        [data-testid="stDataFrame"], [data-testid="stTable"] {
+            max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+        }
+        [data-testid="stDataFrame"] > div { min-width: 0; }
+        [data-testid="stTabs"] { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        /* 3. 触控目标 ≥ 44px；输入框 16px 防 iOS 聚焦时自动放大 */
+        .stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {
+            min-height: 44px !important; font-size: .94rem !important;
+            padding: .5rem .85rem !important;
+        }
+        [data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea,
+        [data-testid="stNumberInput"] input,
+        [data-testid="stSelectbox"] > div > div, [data-testid="stMultiSelect"] > div > div {
+            font-size: 16px !important; min-height: 44px;
+        }
+        [data-testid="stTextArea"] textarea { min-height: 96px; }
+        [data-testid="stFileUploader"] button { min-height: 44px; }
+        [data-testid="stRadio"] label, [data-testid="stCheckbox"] label {
+            min-height: 40px; align-items: center;
+        }
+        [data-testid="stSlider"] { padding: .45rem 0; }
+
+        /* 4. 侧边栏抽屉：限宽，放大导航项，选项文字不被截断 */
+        [data-testid="stSidebar"] { max-width: 88vw; }
+        [data-testid="stSidebar"] .nav-link { padding: 12px 14px !important; font-size: 1rem !important; }
+        [data-testid="stSidebar"] [data-testid="stButton"] > button,
+        [data-testid="stSidebar"] [data-testid="stDownloadButton"] > button { min-height: 44px; }
+
+        /* 5. 顶部快捷导航：吸顶、横向可滑，切页不用再开抽屉 */
+        div[class*="st-key-mobile-nav"] {
+            display: block;
+            position: sticky; top: 0; z-index: 998;
+            margin: -.4rem -.7rem .7rem;
+            padding: .55rem .7rem .5rem;
+            background: rgba(247, 251, 250, .96);
+            -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--line);
+        }
+        div[class*="st-key-mobile-nav"] [data-testid="stPills"],
+        div[class*="st-key-mobile-nav"] [role="radiogroup"] {
+            flex-wrap: nowrap !important; overflow-x: auto !important;
+            scrollbar-width: none; -webkit-overflow-scrolling: touch;
+        }
+        div[class*="st-key-mobile-nav"] [data-testid="stPills"]::-webkit-scrollbar,
+        div[class*="st-key-mobile-nav"] [role="radiogroup"]::-webkit-scrollbar { display: none; }
+        div[class*="st-key-mobile-nav"] button { min-height: 38px; white-space: nowrap; }
+    }
+
+    /* 6. 小屏（≤640px）：多列栅格全部纵向堆叠，避免 4 列挤成一条缝 */
+    @media screen and (max-width: 640px) {
+        [data-testid="stHorizontalBlock"] {
+            display: flex !important; flex-wrap: wrap !important; gap: .5rem !important;
+        }
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            flex: 1 1 100% !important; width: 100% !important; min-width: 100% !important;
+        }
+    }
+
+    /* 7. 添加到主屏幕后全屏运行时，顶部避开状态栏 */
+    @media all and (display-mode: standalone) {
+        [data-testid="stHeader"] { padding-top: env(safe-area-inset-top, 0px); }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -397,6 +505,12 @@ def _norm_page(name):
 def goto(target: str):
     """供首页卡片按钮跳转使用（回调方式；配合 manual_select 实现外部导航）"""
     st.session_state["pending_page"] = target
+    # 顶部快捷导航是带 key 的 widget，值会跨 rerun 保留；外部跳转时清掉它，
+    # 下一轮才会重新以目标页作为默认值，避免手机顶部还高亮着上一页。
+    try:
+        st.session_state.pop("mobile_nav_pills", None)
+    except Exception:
+        pass
 
 
 pending = _norm_page(st.session_state.pop("pending_page", None))
@@ -414,6 +528,75 @@ if pending is None:
     except Exception:
         pass
 pending_idx = NAV_LABELS.index(pending) if pending in NAV_LABELS else None
+
+# ---------------- 移动端顶部快捷导航（仅窄屏显示，CSS 里控制） ----------------
+# 手机上侧边栏是抽屉，切页要「开抽屉 → 点导航 → 关抽屉」三步。这里补一条吸顶
+# 横向标签条，选中后复用现成的 pending_page 跳转通道，侧边栏 option_menu 会同步
+# 跟上；页面路由逻辑本身完全不改，宽屏下这个容器被 CSS 隐藏。
+def _mobile_nav_changed():
+    picked = st.session_state.get("mobile_nav_pills")
+    if isinstance(picked, list):
+        picked = picked[0] if picked else None
+    if picked in NAV_LABELS:
+        st.session_state["pending_page"] = picked
+
+
+with st.container(key="mobile-nav"):
+    st.pills(
+        "页面导航", NAV_LABELS,
+        default=(pending if pending in NAV_LABELS else NAV_LABELS[0]),
+        key="mobile_nav_pills",
+        label_visibility="collapsed",
+        on_change=_mobile_nav_changed,
+    )
+
+# ---------------- 无网关兜底：给顶层文档补移动端 meta ----------------
+# 自建网关会直接在 index.html 的 <head> 注入完整 PWA 标签；但部署到 Streamlit Cloud
+# 时没有网关，iOS「添加到主屏幕」会退化成带地址栏的普通书签。同源的 components
+# iframe 可以够到父文档 head，这里只补几个 meta、不碰 manifest（在线版没有同源
+# 静态资源），任何环境异常都静默跳过，绝不影响主流程。
+# 新版 Streamlit 会提示改用 st.iframe，但那个只接受 URL，data: URL 的 iframe 是
+# opaque origin、够不到父文档；且 st.iframe 在 requirements 下限的 1.46 里还没有。
+# 因此这里刻意保留 components.v1.html，弃用警告不影响功能。
+def _mobile_meta_fallback():
+    try:
+        import streamlit.components.v1 as _components
+
+        _components.html(
+            """
+            <script>
+            (function () {
+              try {
+                var d = window.parent.document;
+                function put(name, content) {
+                  var el = d.querySelector('meta[name="' + name + '"]');
+                  if (!el) {
+                    el = d.createElement('meta');
+                    el.setAttribute('name', name);
+                    d.head.appendChild(el);
+                  }
+                  el.setAttribute('content', content);
+                }
+                put('theme-color', '#2e9e8f');
+                put('apple-mobile-web-app-capable', 'yes');
+                put('mobile-web-app-capable', 'yes');
+                put('apple-mobile-web-app-title', '医学文献');
+                put('apple-mobile-web-app-status-bar-style', 'default');
+                var vp = d.querySelector('meta[name="viewport"]');
+                if (vp && vp.getAttribute('content').indexOf('viewport-fit') < 0) {
+                  vp.setAttribute('content', vp.getAttribute('content') + ', viewport-fit=cover');
+                }
+              } catch (e) {}
+            })();
+            </script>
+            """,
+            height=0,
+        )
+    except Exception:
+        pass
+
+
+_mobile_meta_fallback()
 
 # ---------------- 后台任务（v1.7.0）：全文摘要 / 图表解析 / 批量全文 ----------------
 def _ft_job(job, article: dict, title: str, max_sentences: int):

@@ -1,0 +1,28 @@
+# MedLit 手机版 · 公网 HTTPS 反代
+#
+# 把 medlit.example.com 换成你自己的域名，DNS A 记录指向本机公网 IP。
+# Caddy 会自动申请并续期 Let's Encrypt 证书，也会自动把 WebSocket 升级请求
+# 透传给后端——Streamlit 的实时通道不需要额外配置。
+#
+#   caddy run --config mobile/deploy/Caddyfile        # 前台试跑
+#   sudo caddy validate --config mobile/deploy/Caddyfile
+#
+medlit.example.com {
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:8080 {
+		# 检索 / 全文抓取可能跑得久，别让反代提前掐断长连接
+		transport http {
+			read_timeout  0
+			write_timeout 0
+		}
+		flush_interval -1
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# 不要在这里加 Content-Security-Policy：
+		# Streamlit 前端脚本较多，随手收紧会让页面白屏。
+	}
+}

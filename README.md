@@ -11,7 +11,9 @@ PubMed 检索、全文获取、中文摘要、综述初稿，在一个网页里�
 <img src="https://img.shields.io/github/stars/Fy66666-fy/medical-lit-system?color=f0b400" alt="stars">
 </p>
 
-**[在线直接使用](https://medical-lit-system-fy.streamlit.app/)　·　[Windows 桌面版（可离线）](https://github.com/Fy66666-fy/medical-lit-system/releases/latest)　·　[产品落地页（截图 / 场景 / 技巧）](https://fy66666-fy.github.io/medical-lit-system/)**
+**[在线直接使用](https://medical-lit-system-fy.streamlit.app/)　·　[Windows 桌面版（可离线）](https://github.com/Fy66666-fy/medical-lit-system/releases/latest)　·　[产品落地页（截图 / 场景 / 技巧）](https://fy66666-fy.github.io/medical-lit-system/)　·　[手机使用说明](mobile/README.md)**
+
+> 手机浏览器直接打开在线版即可使用（界面已做移动端适配）；想自定义图标、以独立窗口全屏运行，按[手机使用说明](mobile/README.md)启动 PWA 网关。
 
 <p align="center">
   <img src="docs/shots/01_home.jpg" width="800" alt="检索界面">
